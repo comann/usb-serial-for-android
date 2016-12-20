@@ -27,6 +27,8 @@ import android.content.Intent;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
@@ -75,7 +77,7 @@ public class SerialConsoleActivity extends Activity {
     private CheckBox chkDTR;
     private CheckBox chkRTS;
 
-    private final ExecutorService mExecutor = Executors.newSingleThreadExecutor();
+    private Handler mBackgroundHandler;
 
     private SerialInputOutputManager mSerialIoManager;
 
@@ -107,6 +109,10 @@ public class SerialConsoleActivity extends Activity {
             }
         });
 
+
+        HandlerThread thread =  new HandlerThread("Serial Thread");
+        thread.start();
+        mBackgroundHandler = new Handler(thread.getLooper());
 
         EventBus.getDefault().register(this);
     }
@@ -194,7 +200,7 @@ public class SerialConsoleActivity extends Activity {
         if (sPort != null) {
             Log.i(TAG, "Starting io manager ..");
             mSerialIoManager = new SerialInputOutputManager(sPort);
-            mExecutor.submit(mSerialIoManager);
+            mBackgroundHandler.post(mSerialIoManager);
         }
     }
 
