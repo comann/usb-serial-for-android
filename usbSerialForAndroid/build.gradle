@@ -19,6 +19,10 @@ android {
     }
 }
 
+dependencies{
+    compile 'org.greenrobot:eventbus:3.0.0'
+}
+
 group = "com.hoho.android"
 version = "0.2.0-SNAPSHOT"
 

@@ -34,8 +34,14 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.hoho.android.usbserial.driver.UsbSerialPort;
+import com.hoho.android.usbserial.events.ReadDataEvent;
+import com.hoho.android.usbserial.events.SerialErrorEvent;
 import com.hoho.android.usbserial.util.HexDump;
 import com.hoho.android.usbserial.util.SerialInputOutputManager;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
@@ -73,25 +79,6 @@ public class SerialConsoleActivity extends Activity {
 
     private SerialInputOutputManager mSerialIoManager;
 
-    private final SerialInputOutputManager.Listener mListener =
-            new SerialInputOutputManager.Listener() {
-
-        @Override
-        public void onRunError(Exception e) {
-            Log.d(TAG, "Runner stopped.");
-        }
-
-        @Override
-        public void onNewData(final byte[] data) {
-            SerialConsoleActivity.this.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    SerialConsoleActivity.this.updateReceivedData(data);
-                }
-            });
-        }
-    };
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -120,6 +107,8 @@ public class SerialConsoleActivity extends Activity {
             }
         });
 
+
+        EventBus.getDefault().register(this);
     }
 
 
@@ -136,6 +125,13 @@ public class SerialConsoleActivity extends Activity {
             sPort = null;
         }
         finish();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        EventBus.getDefault().unregister(this);
     }
 
     void showStatus(TextView theTextView, String theLabel, boolean theValue){
@@ -197,7 +193,7 @@ public class SerialConsoleActivity extends Activity {
     private void startIoManager() {
         if (sPort != null) {
             Log.i(TAG, "Starting io manager ..");
-            mSerialIoManager = new SerialInputOutputManager(sPort, mListener);
+            mSerialIoManager = new SerialInputOutputManager(sPort);
             mExecutor.submit(mSerialIoManager);
         }
     }
@@ -207,12 +203,6 @@ public class SerialConsoleActivity extends Activity {
         startIoManager();
     }
 
-    private void updateReceivedData(byte[] data) {
-        final String message = "Read " + data.length + " bytes: \n"
-                + HexDump.dumpHexString(data) + "\n\n";
-        mDumpTextView.append(message);
-        mScrollView.smoothScrollTo(0, mDumpTextView.getBottom());
-    }
 
     /**
      * Starts the activity, using the supplied driver instance.
@@ -225,6 +215,22 @@ public class SerialConsoleActivity extends Activity {
         final Intent intent = new Intent(context, SerialConsoleActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_HISTORY);
         context.startActivity(intent);
+    }
+
+
+
+    @Subscribe(threadMode = ThreadMode.POSTING)
+    public void onEvent(SerialErrorEvent evt){
+        Log.d(TAG, "Runner stopped.");
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onEvent(ReadDataEvent evt){
+        final byte[] data = evt.getData();
+        final String message = "Read " + data.length + " bytes: \n"
+                + HexDump.dumpHexString(data) + "\n\n";
+        mDumpTextView.append(message);
+        mScrollView.smoothScrollTo(0, mDumpTextView.getBottom());
     }
 
 }
