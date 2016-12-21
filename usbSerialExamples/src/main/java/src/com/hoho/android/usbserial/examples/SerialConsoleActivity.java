@@ -22,13 +22,16 @@
 package com.hoho.android.usbserial.examples;
 
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.IBinder;
 import android.util.Log;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
@@ -49,13 +52,15 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import src.com.hoho.android.usbserial.examples.SerialService;
+
 /**
  * Monitors a single {@link UsbSerialPort} instance, showing all data
  * received.
  *
  * @author mike wakerly (opensource@hoho.com)
  */
-public class SerialConsoleActivity extends Activity {
+public class SerialConsoleActivity extends Activity implements ServiceConnection{
 
     private final String TAG = SerialConsoleActivity.class.getSimpleName();
 
@@ -77,9 +82,7 @@ public class SerialConsoleActivity extends Activity {
     private CheckBox chkDTR;
     private CheckBox chkRTS;
 
-    private Handler mBackgroundHandler;
-
-    private SerialInputOutputManager mSerialIoManager;
+    private SerialService mService;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -110,9 +113,8 @@ public class SerialConsoleActivity extends Activity {
         });
 
 
-        HandlerThread thread =  new HandlerThread("Serial Thread");
-        thread.start();
-        mBackgroundHandler = new Handler(thread.getLooper());
+        Intent intent = new Intent(this, SerialService.class);
+        bindService(intent, this, Context.BIND_AUTO_CREATE);
 
         EventBus.getDefault().register(this);
     }
@@ -121,15 +123,8 @@ public class SerialConsoleActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        stopIoManager();
-        if (sPort != null) {
-            try {
-                sPort.close();
-            } catch (IOException e) {
-                // Ignore.
-            }
-            sPort = null;
-        }
+
+        mService.stopMonitoringSerialPort(true);
         finish();
     }
 
@@ -185,28 +180,14 @@ public class SerialConsoleActivity extends Activity {
             }
             mTitleTextView.setText("Serial device: " + sPort.getClass().getSimpleName());
         }
-        onDeviceStateChange();
+        onDeviceStateChange(sPort);
     }
 
-    private void stopIoManager() {
-        if (mSerialIoManager != null) {
-            Log.i(TAG, "Stopping io manager ..");
-            mSerialIoManager.stop();
-            mSerialIoManager = null;
-        }
-    }
 
-    private void startIoManager() {
-        if (sPort != null) {
-            Log.i(TAG, "Starting io manager ..");
-            mSerialIoManager = new SerialInputOutputManager(sPort);
-            mBackgroundHandler.post(mSerialIoManager);
-        }
-    }
 
-    private void onDeviceStateChange() {
-        stopIoManager();
-        startIoManager();
+    private void onDeviceStateChange(UsbSerialPort port) {
+        mService.stopMonitoringSerialPort(false);
+        mService.monitorSerialPort(port);
     }
 
 
@@ -237,6 +218,19 @@ public class SerialConsoleActivity extends Activity {
                 + HexDump.dumpHexString(data) + "\n\n";
         mDumpTextView.append(message);
         mScrollView.smoothScrollTo(0, mDumpTextView.getBottom());
+    }
+
+    //region Service Connection Implementation
+    @Override
+    public void onServiceConnected(ComponentName name, IBinder iBinder) {
+        mService = ((SerialService.LocalBinder) iBinder).getService();
+    }
+
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
+        Log.d(BuildConfig.TAG, "onServiceDisconnected: " + name );
+
     }
 
 }

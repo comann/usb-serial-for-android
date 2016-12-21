@@ -19,7 +19,12 @@ android {
     }
 }
 
+repositories{
+    jcenter()
+}
+
 dependencies{
+    compile 'com.android.support:support-annotations:24.2.1'
     compile 'org.greenrobot:eventbus:3.0.0'
 }
 
