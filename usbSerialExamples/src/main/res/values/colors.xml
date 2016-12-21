@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dark_gray">#666</color>
+    <color name="darker_gray">#333</color>
+    <color name="process_blue">#0081c9</color>
+    <color name="light_gray">#CCC</color>
+    <color name="reflex_blue">#26327a</color>
+
+    <color name="colorAccent">@color/process_blue</color>
+    <color name="colorPrimary" >#fff</color>
+    <color name="colorPrimaryDark">@color/dark_gray</color>
+    <color name="colorSecondary">@color/light_gray</color>
+
+</resources>

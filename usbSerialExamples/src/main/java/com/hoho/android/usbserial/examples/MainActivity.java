@@ -21,7 +21,6 @@
 
 package com.hoho.android.usbserial.examples;
 
-import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -33,30 +32,18 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.IBinder;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.hoho.android.usbserial.driver.UsbSerialPort;
-import com.hoho.android.usbserial.events.ReadDataEvent;
-import com.hoho.android.usbserial.events.SerialErrorEvent;
-import com.hoho.android.usbserial.util.HexDump;
-import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
 import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-import src.com.hoho.android.usbserial.examples.SerialService;
 
 /**
  * Monitors a single {@link UsbSerialPort} instance, showing all data
@@ -64,9 +51,9 @@ import src.com.hoho.android.usbserial.examples.SerialService;
  *
  * @author mike wakerly (opensource@hoho.com)
  */
-public class SerialConsoleActivity extends Activity implements ServiceConnection{
+public class MainActivity extends AppCompatActivity implements ServiceConnection{
 
-    private final String TAG = SerialConsoleActivity.class.getSimpleName();
+    private final String TAG = MainActivity.class.getSimpleName();
 
     /**
      * Driver instance, passed in statically via
@@ -80,62 +67,30 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
      */
     private static UsbSerialPort sPort = null;
 
-    private TextView mTitleTextView;
-    private TextView mDumpTextView;
-    private ScrollView mScrollView;
-    private CheckBox chkDTR;
-    private CheckBox chkRTS;
 
     private SerialService mService;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.serial_console);
-        mTitleTextView = (TextView) findViewById(R.id.demoTitle);
-        mDumpTextView = (TextView) findViewById(R.id.consoleText);
-        mScrollView = (ScrollView) findViewById(R.id.demoScroller);
-        chkDTR = (CheckBox) findViewById(R.id.checkBoxDTR);
-        chkRTS = (CheckBox) findViewById(R.id.checkBoxRTS);
+        setContentView(R.layout.activity_main);
 
-        chkDTR.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                try {
-                    sPort.setDTR(isChecked);
-                }catch (IOException x){}
-            }
-        });
 
-        chkRTS.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                try {
-                    sPort.setRTS(isChecked);
-                }catch (IOException x){
-                    Log.e(BuildConfig.TAG, "Error Opening Port", x);
-                }
-            }
-        });
-
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        setTitle(R.string.app_name);
 
         Intent intent = new Intent(this, SerialService.class);
         bindService(intent, this, Context.BIND_AUTO_CREATE);
 
-        EventBus.getDefault().register(this);
+//        EventBus.getDefault().register(this);
     }
 
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-
-        if(mService != null) {
-            mService.stopMonitoringSerialPort(true);
-        }
-
-        EventBus.getDefault().unregister(this);
+//        EventBus.getDefault().unregister(this);
     }
 
     void showStatus(TextView theTextView, String theLabel, boolean theValue){
@@ -148,7 +103,7 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
         super.onResume();
         Log.d(TAG, "Resumed, port=" + sPort);
         if (sPort == null) {
-            mTitleTextView.setText("No serial device.");
+            getSupportActionBar().setSubtitle("No serial device.");
         } else {
 
             PendingIntent mPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
@@ -160,47 +115,30 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
         }
     }
 
-
-
-    private void onDeviceStateChange(UsbSerialPort port) {
-        mService.stopMonitoringSerialPort(false);
-        mService.monitorSerialPort(port);
+    @Override
+    public void onBackPressed() {
+        if(getSupportFragmentManager().getBackStackEntryCount() > 1){
+            getSupportFragmentManager().popBackStackImmediate();
+        }else{
+            super.onBackPressed();
+        }
     }
 
-
-    /**
-     * Starts the activity, using the supplied driver instance.
-     *
-     * @param context
-     * @param driver
-     */
-    static void show(Context context, UsbSerialPort port) {
-        sPort = port;
-        final Intent intent = new Intent(context, SerialConsoleActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NO_HISTORY);
-        context.startActivity(intent);
-    }
-
-
-
-    @Subscribe(threadMode = ThreadMode.POSTING)
-    public void onEvent(SerialErrorEvent evt){
-        Log.d(TAG, "Runner stopped.");
-    }
-
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    public void onEvent(ReadDataEvent evt){
-        final byte[] data = evt.getData();
-        final String message = "Read " + data.length + " bytes: \n"
-                + HexDump.dumpHexString(data) + "\n\n";
-        mDumpTextView.append(message);
-        mScrollView.smoothScrollTo(0, mDumpTextView.getBottom());
-    }
 
     //region Service Connection Implementation
+
+    public SerialService getSerialService(){
+        return mService;
+    }
+
     @Override
     public void onServiceConnected(ComponentName name, IBinder iBinder) {
         mService = ((SerialService.LocalBinder) iBinder).getService();
+
+        //The app is now ready to be used.
+        getSupportFragmentManager().beginTransaction()
+                .add(R.id.status_frame, DeviceListFragment.newInstance())
+                .commit();
     }
 
 
@@ -222,32 +160,32 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
             String action = intent.getAction();
             if (ACTION_USB_PERMISSION.equals(action)) {
                 synchronized (this) {
-                    UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
 
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                         if(device != null){
                             final UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
                             UsbDeviceConnection connection = usbManager.openDevice(sPort.getDriver().getDevice());
                             if (connection == null) {
-                                mTitleTextView.setText("Opening device failed");
+                                getSupportActionBar().setSubtitle("Opening device failed");
                                 return;
                             }
 
                             try {
                                 sPort.open(connection);
                                 sPort.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
-
-                                showStatus(mDumpTextView, "CD  - Carrier Detect", sPort.getCD());
-                                showStatus(mDumpTextView, "CTS - Clear To Send", sPort.getCTS());
-                                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
-                                showStatus(mDumpTextView, "DTR - Data Terminal Ready", sPort.getDTR());
-                                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
-                                showStatus(mDumpTextView, "RI  - Ring Indicator", sPort.getRI());
-                                showStatus(mDumpTextView, "RTS - Request To Send", sPort.getRTS());
+//
+//                                showStatus(mDumpTextView, "CD  - Carrier Detect", sPort.getCD());
+//                                showStatus(mDumpTextView, "CTS - Clear To Send", sPort.getCTS());
+//                                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
+//                                showStatus(mDumpTextView, "DTR - Data Terminal Ready", sPort.getDTR());
+//                                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
+//                                showStatus(mDumpTextView, "RI  - Ring Indicator", sPort.getRI());
+//                                showStatus(mDumpTextView, "RTS - Request To Send", sPort.getRTS());
 
                             } catch (IOException e) {
                                 Log.e(TAG, "Error setting up device: " + e.getMessage(), e);
-                                mTitleTextView.setText("Error opening device: " + e.getMessage());
+                                getSupportActionBar().setSubtitle("Error opening device: " + e.getMessage());
                                 try {
                                     sPort.close();
                                 } catch (IOException e2) {
@@ -256,7 +194,7 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
                                 sPort = null;
                                 return;
                             }
-                            mTitleTextView.setText("Serial device: " + sPort.getClass().getSimpleName());
+                            getSupportActionBar().setSubtitle("Serial device: " + sPort.getClass().getSimpleName());
                         }
                     }
                     else {
@@ -266,6 +204,13 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
             }
         }
     };
+
+    public void onDeviceSelected(UsbDevice port) {
+        getSupportFragmentManager()
+                .beginTransaction()
+                .add(R.id.status_frame, SerialConsoleFragment.newInstance(port))
+                .commit();
+    }
 
     //endregion
 }

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/darker_gray"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <CheckBox
+            android:id="@+id/checkBoxDTR"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/textBtnDTR" />
+
+
+        <CheckBox
+            android:layout_marginStart="10dp"
+            android:id="@+id/checkBoxRTS"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/textBtnRTS" />
+
+    </LinearLayout>
+
+
+    <View
+        android:id="@+id/separator2"
+        android:layout_width="match_parent"
+        android:layout_height="1dip"
+        android:layout_below="@+id/demoTitle"
+        android:background="#eeeeee" />
+
+    <android.support.v4.widget.NestedScrollView
+        android:id="@+id/demoScroller"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/colorPrimary">
+
+        <TextView
+            android:id="@+id/consoleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textIsSelectable="true"
+            android:typeface="monospace" />
+    </android.support.v4.widget.NestedScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <EditText
+            android:id="@+id/edit_send"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:text="Send"/>
+    </LinearLayout>
+</LinearLayout>
