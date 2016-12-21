@@ -47,6 +47,7 @@ public class SerialService extends Service {
         stopMonitoringSerialPort(true);
     }
 
+
     public void monitorSerialPort(@NonNull UsbSerialPort sPort) {
         Log.i(BuildConfig.TAG, "Starting io manager ..");
 

@@ -22,10 +22,14 @@
 package com.hoho.android.usbserial.examples;
 
 import android.app.Activity;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
@@ -108,7 +112,9 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 try {
                     sPort.setRTS(isChecked);
-                }catch (IOException x){}
+                }catch (IOException x){
+                    Log.e(BuildConfig.TAG, "Error Opening Port", x);
+                }
             }
         });
 
@@ -121,16 +127,13 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
 
 
     @Override
-    protected void onPause() {
-        super.onPause();
-
-        mService.stopMonitoringSerialPort(true);
-        finish();
-    }
-
-    @Override
     protected void onDestroy() {
         super.onDestroy();
+
+
+        if(mService != null) {
+            mService.stopMonitoringSerialPort(true);
+        }
 
         EventBus.getDefault().unregister(this);
     }
@@ -147,40 +150,14 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
         if (sPort == null) {
             mTitleTextView.setText("No serial device.");
         } else {
+
+            PendingIntent mPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
+            IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
+            registerReceiver(mUsbReceiver, filter);
+
             final UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
-
-            UsbDeviceConnection connection = usbManager.openDevice(sPort.getDriver().getDevice());
-            if (connection == null) {
-                mTitleTextView.setText("Opening device failed");
-                return;
-            }
-
-            try {
-                sPort.open(connection);
-                sPort.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
-
-                showStatus(mDumpTextView, "CD  - Carrier Detect", sPort.getCD());
-                showStatus(mDumpTextView, "CTS - Clear To Send", sPort.getCTS());
-                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
-                showStatus(mDumpTextView, "DTR - Data Terminal Ready", sPort.getDTR());
-                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
-                showStatus(mDumpTextView, "RI  - Ring Indicator", sPort.getRI());
-                showStatus(mDumpTextView, "RTS - Request To Send", sPort.getRTS());
-
-            } catch (IOException e) {
-                Log.e(TAG, "Error setting up device: " + e.getMessage(), e);
-                mTitleTextView.setText("Error opening device: " + e.getMessage());
-                try {
-                    sPort.close();
-                } catch (IOException e2) {
-                    // Ignore.
-                }
-                sPort = null;
-                return;
-            }
-            mTitleTextView.setText("Serial device: " + sPort.getClass().getSimpleName());
+            usbManager.requestPermission(sPort.getDriver().getDevice(), mPermissionIntent);
         }
-        onDeviceStateChange(sPort);
     }
 
 
@@ -233,4 +210,62 @@ public class SerialConsoleActivity extends Activity implements ServiceConnection
 
     }
 
+    //endregion
+
+
+    //region USB Permissions
+
+    private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
+    private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
+
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (ACTION_USB_PERMISSION.equals(action)) {
+                synchronized (this) {
+                    UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+
+                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        if(device != null){
+                            final UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
+                            UsbDeviceConnection connection = usbManager.openDevice(sPort.getDriver().getDevice());
+                            if (connection == null) {
+                                mTitleTextView.setText("Opening device failed");
+                                return;
+                            }
+
+                            try {
+                                sPort.open(connection);
+                                sPort.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
+
+                                showStatus(mDumpTextView, "CD  - Carrier Detect", sPort.getCD());
+                                showStatus(mDumpTextView, "CTS - Clear To Send", sPort.getCTS());
+                                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
+                                showStatus(mDumpTextView, "DTR - Data Terminal Ready", sPort.getDTR());
+                                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
+                                showStatus(mDumpTextView, "RI  - Ring Indicator", sPort.getRI());
+                                showStatus(mDumpTextView, "RTS - Request To Send", sPort.getRTS());
+
+                            } catch (IOException e) {
+                                Log.e(TAG, "Error setting up device: " + e.getMessage(), e);
+                                mTitleTextView.setText("Error opening device: " + e.getMessage());
+                                try {
+                                    sPort.close();
+                                } catch (IOException e2) {
+                                    // Ignore.
+                                }
+                                sPort = null;
+                                return;
+                            }
+                            mTitleTextView.setText("Serial device: " + sPort.getClass().getSimpleName());
+                        }
+                    }
+                    else {
+                        Log.d(TAG, "permission denied for device " + device);
+                    }
+                }
+            }
+        }
+    };
+
+    //endregion
 }
