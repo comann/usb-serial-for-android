@@ -12,15 +12,18 @@
 
         <CheckBox
             android:id="@+id/checkBoxDTR"
-            android:layout_width="wrap_content"
+            android:textSize="12sp"
+            android:layout_weight="1"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:text="@string/textBtnDTR" />
 
 
         <CheckBox
-            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:textSize="12sp"
             android:id="@+id/checkBoxRTS"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:text="@string/textBtnRTS" />
 
@@ -41,10 +44,11 @@
         android:layout_weight="1"
         android:background="@color/colorPrimary">
 
-        <TextView
+        <TextView xmlns:tools="http://schemas.android.com/tools"
+            android:textColor="@color/colorPrimaryDark"
             android:id="@+id/consoleText"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:textIsSelectable="true"
             android:typeface="monospace" />
     </android.support.v4.widget.NestedScrollView>
@@ -58,11 +62,15 @@
             android:id="@+id/edit_send"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:lines="1"
+            android:maxLines="1"/>
 
         <Button
+            android:id="@+id/btnSend"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:text="Send"/>
+            android:text="@string/send"/>
     </LinearLayout>
 </LinearLayout>

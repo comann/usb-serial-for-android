@@ -13,11 +13,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.events.ReadDataEvent;
 import com.hoho.android.usbserial.events.SerialErrorEvent;
+import com.hoho.android.usbserial.examples.events.SerialConnectionEvent;
 import com.hoho.android.usbserial.util.HexDump;
 
 import org.greenrobot.eventbus.EventBus;
@@ -44,6 +47,7 @@ public class SerialConsoleFragment extends Fragment {
     private CheckBox chkDTR;
     private CheckBox chkRTS;
 
+    private EditText editSendText;
     //region Lifecycle Methods
 
     @Override
@@ -87,6 +91,15 @@ public class SerialConsoleFragment extends Fragment {
                 }
             }
         });
+
+        this.editSendText = ((EditText) view.findViewById(R.id.edit_send));
+        view.findViewById(R.id.btnSend).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String command = editSendText.getText().toString() + "\r\n";
+                getService().write(getUsbDevice(), command);
+            }
+        });
     }
 
 
@@ -100,6 +113,28 @@ public class SerialConsoleFragment extends Fragment {
 
 
     //region Bus Methods
+    void showStatus(TextView theTextView, String theLabel, boolean theValue){
+        String msg = theLabel + ": " + (theValue ? "enabled" : "disabled") + "\n";
+        theTextView.append(msg);
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onEvent(SerialConnectionEvent event) {
+        if(event.isSuccessfullyOpened()) {
+            try {
+                UsbSerialPort sPort = event.getPort();
+                showStatus(mDumpTextView, "CD  - Carrier Detect", sPort.getCD());
+                showStatus(mDumpTextView, "CTS - Clear To Send", sPort.getCTS());
+                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
+                showStatus(mDumpTextView, "DTR - Data Terminal Ready", sPort.getDTR());
+                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
+                showStatus(mDumpTextView, "RI  - Ring Indicator", sPort.getRI());
+                showStatus(mDumpTextView, "RTS - Request To Send", sPort.getRTS());
+            }catch(IOException ex){
+                ex.printStackTrace();
+            }
+        }
+    }
     @Subscribe(threadMode = ThreadMode.POSTING)
     public void onEvent(SerialErrorEvent evt){
         Log.d(BuildConfig.TAG, "Runner stopped.");
@@ -108,8 +143,7 @@ public class SerialConsoleFragment extends Fragment {
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onEvent(ReadDataEvent evt){
         final byte[] data = evt.getData();
-        final String message = "Read " + data.length + " bytes: \n"
-                + HexDump.dumpHexString(data) + "\n\n";
+        final String message = "RX: "  + new String(data);
         mDumpTextView.append(message);
         mScrollView.smoothScrollTo(0, mDumpTextView.getBottom());
     }

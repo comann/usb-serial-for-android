@@ -39,8 +39,11 @@ import android.util.Log;
 import android.widget.TextView;
 
 import com.hoho.android.usbserial.driver.UsbSerialPort;
+import com.hoho.android.usbserial.examples.events.SerialConnectionEvent;
 
 import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.IOException;
 
@@ -68,6 +71,7 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
     private static UsbSerialPort sPort = null;
 
 
+    private SerialConsoleFragment mSerialConsoleFragment;
     private SerialService mService;
 
     @Override
@@ -80,39 +84,19 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
         setSupportActionBar(toolbar);
         setTitle(R.string.app_name);
 
-        Intent intent = new Intent(this, SerialService.class);
-        bindService(intent, this, Context.BIND_AUTO_CREATE);
+        if(savedInstanceState == null || mService == null) {
+            Intent intent = new Intent(this, SerialService.class);
+            bindService(intent, this, Context.BIND_AUTO_CREATE);
+        }
 
-//        EventBus.getDefault().register(this);
+        EventBus.getDefault().register(this);
     }
 
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-//        EventBus.getDefault().unregister(this);
-    }
-
-    void showStatus(TextView theTextView, String theLabel, boolean theValue){
-        String msg = theLabel + ": " + (theValue ? "enabled" : "disabled") + "\n";
-        theTextView.append(msg);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        Log.d(TAG, "Resumed, port=" + sPort);
-        if (sPort == null) {
-            getSupportActionBar().setSubtitle("No serial device.");
-        } else {
-
-            PendingIntent mPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
-            IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
-            registerReceiver(mUsbReceiver, filter);
-
-            final UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
-            usbManager.requestPermission(sPort.getDriver().getDevice(), mPermissionIntent);
-        }
+        EventBus.getDefault().unregister(this);
     }
 
     @Override
@@ -145,70 +129,53 @@ public class MainActivity extends AppCompatActivity implements ServiceConnection
     @Override
     public void onServiceDisconnected(ComponentName name) {
         Log.d(BuildConfig.TAG, "onServiceDisconnected: " + name );
-
     }
 
     //endregion
 
 
-    //region USB Permissions
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onEvent(SerialConnectionEvent event) {
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setSubtitle(event.getStatus());
+        }
+    }
 
+    //region USB Permissions
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
     private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
 
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (ACTION_USB_PERMISSION.equals(action)) {
-                synchronized (this) {
-                    UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-
-                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                        if(device != null){
-                            final UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
-                            UsbDeviceConnection connection = usbManager.openDevice(sPort.getDriver().getDevice());
-                            if (connection == null) {
-                                getSupportActionBar().setSubtitle("Opening device failed");
-                                return;
-                            }
-
-                            try {
-                                sPort.open(connection);
-                                sPort.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
-//
-//                                showStatus(mDumpTextView, "CD  - Carrier Detect", sPort.getCD());
-//                                showStatus(mDumpTextView, "CTS - Clear To Send", sPort.getCTS());
-//                                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
-//                                showStatus(mDumpTextView, "DTR - Data Terminal Ready", sPort.getDTR());
-//                                showStatus(mDumpTextView, "DSR - Data Set Ready", sPort.getDSR());
-//                                showStatus(mDumpTextView, "RI  - Ring Indicator", sPort.getRI());
-//                                showStatus(mDumpTextView, "RTS - Request To Send", sPort.getRTS());
-
-                            } catch (IOException e) {
-                                Log.e(TAG, "Error setting up device: " + e.getMessage(), e);
-                                getSupportActionBar().setSubtitle("Error opening device: " + e.getMessage());
-                                try {
-                                    sPort.close();
-                                } catch (IOException e2) {
-                                    // Ignore.
-                                }
-                                sPort = null;
-                                return;
-                            }
-                            getSupportActionBar().setSubtitle("Serial device: " + sPort.getClass().getSimpleName());
-                        }
-                    }
-                    else {
-                        Log.d(TAG, "permission denied for device " + device);
+                UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                    if (device != null) {
+                        mService.openUsbConnection(device, 115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
                     }
                 }
             }
         }
     };
 
-    public void onDeviceSelected(UsbDevice port) {
+    public void onDeviceSelected(UsbDevice usbDevice) {
+        if(mSerialConsoleFragment == null) {
+            mSerialConsoleFragment = SerialConsoleFragment.newInstance(usbDevice);
+        }else{
+            mSerialConsoleFragment.getArguments().putParcelable("EXTRA_DEVICE", usbDevice);
+        }
+
+
+        PendingIntent mPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
+        IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
+        registerReceiver(mUsbReceiver, filter);
+
+        final UsbManager usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        usbManager.requestPermission(usbDevice, mPermissionIntent);
+
         getSupportFragmentManager()
                 .beginTransaction()
-                .add(R.id.status_frame, SerialConsoleFragment.newInstance(port))
+                .add(R.id.status_frame, mSerialConsoleFragment)
                 .commit();
     }
 
